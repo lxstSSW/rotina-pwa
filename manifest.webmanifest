@@ -1,0 +1,12 @@
+{
+  "name": "Rotina",
+  "short_name": "Rotina",
+  "start_url": "index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0e0f12",
+  "theme_color": "#0e0f12",
+  "icons": [
+    { "src": "https://bzocvknhsqcngnjgvayg.supabase.co/functions/v1/rotina-icone", "sizes": "any", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
