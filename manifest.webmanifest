@@ -7,6 +7,6 @@
   "background_color": "#0e0f12",
   "theme_color": "#0e0f12",
   "icons": [
-    { "src": "https://bzocvknhsqcngnjgvayg.supabase.co/functions/v1/rotina-icone", "sizes": "any", "type": "image/png", "purpose": "any maskable" }
+    { "src": "icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
   ]
 }
