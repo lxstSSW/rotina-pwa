@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rotina</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="https://bzocvknhsqcngnjgvayg.supabase.co/functions/v1/rotina-icone">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Rotina">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#0e0f12">
+<style>
+  :root{ color-scheme: dark; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; min-height:100vh; padding:24px;
+    background:linear-gradient(160deg,#212329,#15161a 55%,#0e0f12); color:#f1f1f2;
+    font-family:-apple-system,"Segoe UI",system-ui,sans-serif; display:grid; place-items:center; }
+  .card{ width:100%; max-width:360px; background:rgba(17,18,21,.6); border:1px solid rgba(255,255,255,.1);
+    border-radius:20px; padding:26px 22px; -webkit-backdrop-filter:blur(20px); backdrop-filter:blur(20px); text-align:center; }
+  .ic{ width:72px; height:72px; margin:0 auto 14px; border-radius:20px;
+    background:linear-gradient(160deg,#212329,#0e0f12); display:grid; place-items:center;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.1); }
+  .ic svg{ width:42px; height:42px; }
+  h1{ font-size:21px; font-weight:600; margin:0; }
+  p{ font-size:14px; color:#a7a7ac; margin:8px 0 0; line-height:1.5; }
+  button{ margin-top:18px; width:100%; border:none; border-radius:12px; padding:14px; font-size:15px;
+    font-weight:600; font-family:inherit; cursor:pointer; background:#f1f1f2; color:#161618; }
+  button:disabled{ opacity:.5; }
+  .ghost{ background:transparent; color:#cfcfd2; border:1px solid rgba(255,255,255,.18); }
+  input{ margin-top:12px; width:100%; padding:12px; border-radius:10px; border:1px solid rgba(255,255,255,.18);
+    background:rgba(255,255,255,.05); color:#f1f1f2; font-size:13px; font-family:inherit; }
+  .status{ margin-top:16px; font-size:13px; color:#a7a7ac; min-height:18px; }
+  .ok{ color:#9fe1cb; } .err{ color:#f0997b; }
+  .hint{ font-size:12px; color:#76767e; margin-top:14px; line-height:1.5; }
+  .hide{ display:none; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="ic" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#f2f2f4" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 6.5C9.5 6.5 8 8.5 8 11v2.6L6.7 16h10.6L16 13.6V11c0-2.5-1.5-4.5-4-4.5z"/>
+        <path d="M10.4 16a1.7 1.5 0 0 0 3.2 0"/>
+        <path d="M12 5.4v1.1"/>
+      </svg>
+    </div>
+    <h1>Rotina</h1>
+    <p id="sub">Receba seus lembretes aqui, com os botões Feito e Soneca.</p>
+
+    <button id="ativar">Ativar notificações</button>
+
+    <div id="codeWrap" class="hide">
+      <input id="code" placeholder="cole seu código secreto" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <button id="salvar" class="ghost">Salvar código</button>
+    </div>
+
+    <div id="status" class="status"></div>
+    <div id="iosHint" class="hint hide">No iPhone: toque em Compartilhar e em "Adicionar à Tela de Início", depois abra por lá e ative.</div>
+  </div>
+
+<script>
+  var VAPID_PUBLIC = "BCRiOAUbj1DeYMlrOVjC-KQTYAxMhtwwmhMGbjfjPbThB4JHggvj1cQANHkeGv2qIeCEdeFe6lCR8VZb4TNh4fs";
+  var NTFY = "https://ntfy.sh";
+
+  var $ = function(id){ return document.getElementById(id); };
+  var statusEl = $('status'), ativar = $('ativar'), codeWrap = $('codeWrap'), iosHint = $('iosHint');
+  var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  var standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+
+  function setStatus(msg, cls){ statusEl.textContent = msg; statusEl.className = 'status ' + (cls || ''); }
+
+  function urlB64ToUint8Array(b64){
+    var pad = '='.repeat((4 - b64.length % 4) % 4);
+    var base = (b64 + pad).replace(/-/g, '+').replace(/_/g, '/');
+    var raw = atob(base); var out = new Uint8Array(raw.length);
+    for (var i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+    return out;
+  }
+  function getSecret(){
+    var m = location.hash.match(/k=([A-Za-z0-9_-]+)/);
+    if (m) { localStorage.setItem('rotina_k', m[1]); return m[1]; }
+    return localStorage.getItem('rotina_k');
+  }
+
+  var secret = getSecret();
+  if (!secret) { setStatus('Cole o código do seu link para liberar.', 'err'); codeWrap.classList.remove('hide'); }
+  if (isIOS && !standalone) { iosHint.classList.remove('hide'); }
+
+  $('salvar').onclick = function(){
+    var v = $('code').value.trim();
+    if (v) { localStorage.setItem('rotina_k', v); secret = v; codeWrap.classList.add('hide'); setStatus('Código salvo. Toque em Ativar.', 'ok'); }
+  };
+
+  ativar.onclick = async function(){
+    if (!secret) { setStatus('Cole o código primeiro.', 'err'); codeWrap.classList.remove('hide'); return; }
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) { setStatus('Este navegador não suporta push.', 'err'); return; }
+    if (isIOS && !standalone) { setStatus('No iPhone, adicione à Tela de Início primeiro e abra por lá.', 'err'); iosHint.classList.remove('hide'); return; }
+    ativar.disabled = true;
+    try {
+      setStatus('Pedindo permissão...');
+      var perm = await Notification.requestPermission();
+      if (perm !== 'granted') { setStatus('Permissão negada. Ative nas configurações.', 'err'); ativar.disabled = false; return; }
+      var reg = await navigator.serviceWorker.register('sw.js', { scope: './' });
+      await navigator.serviceWorker.ready;
+      var sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToUint8Array(VAPID_PUBLIC) });
+      var resp = await fetch(NTFY + '/rotina-' + secret + '-subs', { method: 'POST', body: JSON.stringify(sub) });
+      if (!resp.ok) throw new Error('falha ao registrar (' + resp.status + ')');
+      setStatus('Ativado. Você vai receber os lembretes aqui.', 'ok');
+    } catch (e) {
+      setStatus('Erro: ' + (e && e.message ? e.message : e), 'err');
+    }
+    ativar.disabled = false;
+  };
+</script>
+</body>
+</html>
