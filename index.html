@@ -33,6 +33,8 @@
   .status{ margin-top:16px; font-size:13px; color:#a7a7ac; min-height:18px; }
   .ok{ color:#9fe1cb; } .err{ color:#f0997b; }
   .hint{ font-size:12px; color:#76767e; margin-top:14px; line-height:1.5; }
+  textarea{ margin-top:12px; width:100%; padding:12px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:rgba(255,255,255,.05); color:#f1f1f2; font-size:14px; font-family:inherit; resize:vertical; }
+  hr{ border:0; border-top:1px solid rgba(255,255,255,.1); margin:20px 0; }
   .hide{ display:none; }
 </style>
 </head>
@@ -57,6 +59,13 @@
 
     <div id="status" class="status"></div>
     <div id="iosHint" class="hint hide">No iPhone: toque em Compartilhar e em "Adicionar à Tela de Início", depois abra por lá e ative.</div>
+
+    <div id="capturaWrap" class="hide">
+      <hr>
+      <textarea id="capturaTxt" rows="2" placeholder="Anota rápido, lust... (ex.: cobrar cliente X em 2 dias)"></textarea>
+      <button id="capturaBtn" class="ghost">Anotar na agenda</button>
+      <div id="capturaStatus" class="status"></div>
+    </div>
   </div>
 
 <script>
@@ -86,6 +95,22 @@
   var secret = getSecret();
   if (!secret) { setStatus('Cole o código do seu link para liberar.', 'err'); codeWrap.classList.remove('hide'); }
   if (isIOS && !standalone) { iosHint.classList.remove('hide'); }
+
+  // Captura rápida -> tópico secreto; o PC arquiva na agenda e confirma.
+  var capWrap = $('capturaWrap'), capTxt = $('capturaTxt'), capBtn = $('capturaBtn'), capSt = $('capturaStatus');
+  if (secret) capWrap.classList.remove('hide');
+  if (capBtn) capBtn.onclick = async function(){
+    var v = (capTxt.value || '').trim();
+    if (!v) return;
+    if (!secret) { capSt.textContent = 'Cole o código primeiro.'; capSt.className = 'status err'; return; }
+    capBtn.disabled = true; capSt.textContent = 'Anotando...'; capSt.className = 'status';
+    try {
+      var r = await fetch(NTFY + '/rotina-' + secret + '-captura', { method: 'POST', body: v });
+      if (!r.ok) throw new Error('falha ' + r.status);
+      capTxt.value = ''; capSt.textContent = 'Anotado, lust ✓'; capSt.className = 'status ok';
+    } catch (e) { capSt.textContent = 'Erro: ' + (e.message || e); capSt.className = 'status err'; }
+    capBtn.disabled = false;
+  };
 
   $('salvar').onclick = function(){
     var v = $('code').value.trim();
