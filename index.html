@@ -124,6 +124,31 @@
   .vazio .vt{ font-size:14.5px; color:var(--ink2); font-weight:500; margin-bottom:5px; }
   .vazio .vh{ font-size:12.5px; line-height:1.55; max-width:280px; margin:0 auto; }
 
+  /* HOJE — aproveitamento */
+  .apv-wrap{ margin-bottom:18px; }
+  .apv{ display:flex; align-items:center; gap:14px; padding:15px; border:1px solid var(--line); border-radius:16px; background:linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.022)); box-shadow:inset 0 1px 0 rgba(255,255,255,.05), 0 10px 24px -18px rgba(0,0,0,.8); }
+  .apv-ring{ position:relative; width:80px; height:80px; flex:none; }
+  .apv-ring svg{ width:80px; height:80px; display:block; }
+  .apv-track{ fill:none; stroke:rgba(255,255,255,.1); stroke-width:7; }
+  .apv-prog{ fill:none; stroke:var(--ink); stroke-width:7; stroke-linecap:round; transition:stroke-dashoffset .65s cubic-bezier(.2,.85,.25,1); }
+  .apv-pct{ position:absolute; inset:0; display:grid; place-items:center; font-size:22px; font-weight:700; letter-spacing:-.02em; }
+  .apv-pct small{ font-size:11px; font-weight:600; color:var(--ink3); margin-left:1px; }
+  .apv-info{ flex:1; min-width:0; }
+  .apv-ttl{ font-size:14px; font-weight:600; }
+  .apv-msg{ font-size:12.5px; color:var(--ink2); margin-top:2px; }
+  .apv-bd{ font-size:11.5px; color:var(--ink3); margin-top:6px; }
+  .apv-stats{ display:flex; flex-wrap:wrap; gap:6px; margin-top:9px; align-items:center; }
+  .apv-stats span{ font-size:11px; padding:7px 11px; border-radius:20px; background:rgba(255,255,255,.05); border:1px solid var(--line); color:var(--ink2); display:inline-flex; align-items:center; gap:5px; white-space:nowrap; }
+  .apv-streak{ font-weight:600; color:var(--ink); }
+  .apv-streak svg{ width:12px; height:12px; }
+  .apv-streak.zero{ color:var(--ink3); font-weight:400; }
+  .apv-meta{ cursor:pointer; min-height:44px; padding:7px 13px; color:var(--ink); }
+  .apv-hist{ display:flex; align-items:flex-end; gap:4px; height:32px; margin-top:12px; padding:0 2px; overflow:hidden; }
+  .apv-bar{ flex:1 1 0; min-height:3px; border-radius:3px; background:rgba(255,255,255,.13); transition:height .45s cubic-bezier(.2,.85,.25,1); }
+  .apv-bar.apv-bom{ background:rgba(255,255,255,.6); }
+  .apv-bar.apv-empty{ background:rgba(255,255,255,.045); }
+  .apv-bar.apv-today{ outline:1.5px solid var(--ink2); outline-offset:1px; }
+
   /* HOJE — prioridades */
   .priobox{ display:flex; flex-direction:column; gap:9px; }
   .prow{ display:flex; align-items:center; gap:10px; min-height:54px; padding:11px 13px; border:1px solid var(--line); border-radius:13px; background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.025)); }
@@ -261,7 +286,8 @@
   <main>
     <!-- HOJE -->
     <section id="pane-hoje" class="pane">
-      <h2>Hoje</h2><div class="sub">Suas 3 prioridades + a agenda do dia.</div>
+      <h2>Hoje</h2><div class="sub">Seu aproveitamento, as 3 prioridades e a agenda do dia.</div>
+      <div id="apvBox" class="apv-wrap"></div>
       <div id="prioBox" class="priobox"></div>
       <div class="hjsep">Agenda de hoje</div>
       <div id="hjAgenda"><div class="skel"></div><div class="skel"></div></div>
@@ -572,6 +598,43 @@
   $('chatSend').onclick = enviarChat;
   $('chatTxt').addEventListener('keydown', function(e){ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); enviarChat(); } });
 
+  // ---- HOJE: aproveitamento do dia ----
+  function apvMsg(pct, meta){
+    if(pct>=90) return 'Dia impecável, lust.';
+    if(pct>=meta) return 'Dia bom — meta batida.';
+    if(pct>=40) return 'Dá pra fechar mais hoje.';
+    if(pct>0) return 'Bom começo, segue nele.';
+    return 'Bora começar o dia, lust.';
+  }
+  function renderApv(d){
+    var box=$('apvBox'); if(!box||!d) return;
+    var pct=d.pct||0, meta=d.meta||70, c=2*Math.PI*36, off=c*(1-Math.max(0,Math.min(100,pct))/100);
+    var ring='<svg viewBox="0 0 84 84"><circle class="apv-track" cx="42" cy="42" r="36"/><circle class="apv-prog" cx="42" cy="42" r="36" stroke-dasharray="'+c.toFixed(1)+'" stroke-dashoffset="'+off.toFixed(1)+'" transform="rotate(-90 42 42)"/></svg>';
+    var streakTxt=(d.streak>0)?(HIC.flame+' '+d.streak+(d.streak===1?' dia seguido':' dias seguidos')):(HIC.flame+' sem streak ainda');
+    var bars='';
+    (d.historico||[]).forEach(function(x){
+      var ph=(x.pct==null)?3:Math.max(4,Math.round(x.pct/100*30));
+      var cls='apv-bar'+(x.pct==null?' apv-empty':(x.bom?' apv-bom':''))+(x.dia===d.dia?' apv-today':'');
+      bars+='<div class="'+cls+'" style="height:'+ph+'px"></div>';
+    });
+    box.innerHTML='<div class="apv">'
+      +'<div class="apv-ring">'+ring+'<div class="apv-pct"><span>'+pct+'<small>%</small></span></div></div>'
+      +'<div class="apv-info">'
+        +'<div class="apv-ttl">Aproveitamento de hoje</div>'
+        +'<div class="apv-msg">'+apvMsg(pct,meta)+'</div>'
+        +'<div class="apv-bd">'+d.prioFeitas+'/'+d.prioTotal+' prioridades · '+d.habFeitos+'/'+d.habTotal+' hábitos</div>'
+        +'<div class="apv-stats">'
+          +'<span class="apv-streak'+(d.streak>0?'':' zero')+'">'+streakTxt+'</span>'
+          +'<span>recorde '+d.recorde+'</span>'
+          +(d.mediaSemana!=null?'<span>semana '+d.mediaSemana+'%</span>':'')
+          +'<span class="apv-meta" id="apvMeta">meta '+meta+'% ›</span>'
+        +'</div>'
+      +'</div></div>'
+      +'<div class="apv-hist">'+bars+'</div>';
+    var mt=$('apvMeta'); if(mt) mt.onclick=function(){ var vals=[50,60,70,80,90]; var nv=vals.filter(function(v){return v>meta;})[0]||vals[0]; rpc('dia.meta',{valor:nv}).then(refreshApv).catch(function(){}); };
+  }
+  function refreshApv(){ rpc('dia.resumo').then(function(r){ if(r&&r.data) renderApv(r.data); }).catch(function(){}); }
+
   // ---- HOJE ----
   function renderPrio(itens){
     var box=$('prioBox'); box.innerHTML='';
@@ -581,7 +644,7 @@
       var chk=document.createElement('button'); chk.className='pchk'; chk.innerHTML='<i><svg viewBox="0 0 14 11" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 6l3.5 3.5L12.5 1.5"/></svg></i>';
       var num=document.createElement('span'); num.className='pnum'; num.textContent=(idx+1);
       var inp=document.createElement('input'); inp.className='pinp'; inp.placeholder='Prioridade '+(idx+1); inp.value=it.texto; inp.maxLength=140;
-      chk.onclick=function(){ if(!inp.value.trim()) return; row.classList.toggle('done'); salvarPrio(); };
+      chk.onclick=function(){ if(!inp.value.trim()) return; row.classList.toggle('done'); salvarPrio(); refreshApv(); };
       inp.addEventListener('blur', salvarPrio);
       inp.addEventListener('keydown', function(e){ if(e.key==='Enter') inp.blur(); });
       row.appendChild(chk); row.appendChild(num); row.appendChild(inp); box.appendChild(row);
@@ -593,6 +656,7 @@
     rpc('prioridades.definir',{itens:itens}).catch(function(){});
   }
   async function carregarHoje(){
+    refreshApv();
     try{ var r=await rpc('prioridades.listar'); renderPrio((r&&r.data&&r.data.itens)||[]); }catch(e){ renderPrio([]); }
     var box=$('hjAgenda');
     try{ var ar=await rpc('alarmes.listar'); var a=((ar&&ar.data)||[]).filter(function(t){return t.ativo;}).sort(function(x,y){return (x.horario||'').localeCompare(y.horario||'');});
