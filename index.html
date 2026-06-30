@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Rotina</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon.png">
@@ -44,7 +44,7 @@
   .row .t1{ font-size:15px; font-weight:500; }
   .row .t2{ font-size:12px; color:var(--ink2); margin-top:2px; word-break:break-word; }
   .time{ font-variant-numeric:tabular-nums; font-size:15px; font-weight:600; min-width:46px; }
-  .x{ background:none; border:0; color:var(--ink3); font-size:20px; padding:4px 6px; cursor:pointer; }
+  .x{ background:none; border:0; color:var(--ink3); font-size:20px; padding:9px 11px; cursor:pointer; }
   .x:active{ color:var(--err); }
   .sw{ width:42px; height:26px; border-radius:13px; background:rgba(255,255,255,.15); position:relative; border:0; cursor:pointer; flex:none; }
   .sw::after{ content:""; position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:#fff; transition:left .15s; }
@@ -64,7 +64,7 @@
   .nrow.done .ntext{ text-decoration:line-through; color:var(--ink3); }
   .nedit{ flex:1; padding:8px 10px; font-size:14px; border-radius:9px; }
   .nacts{ display:flex; align-items:center; gap:1px; flex:none; }
-  .nrow .act{ width:32px; height:32px; border:0; background:transparent; color:var(--ink3); border-radius:8px; display:grid; place-items:center; font-size:20px; padding:0; font-family:inherit; }
+  .nrow .act{ width:40px; height:40px; border:0; background:transparent; color:var(--ink3); border-radius:9px; display:grid; place-items:center; font-size:20px; padding:0; font-family:inherit; }
   .nrow .act svg{ width:18px; height:18px; }
   .nrow .act:active{ background:rgba(255,255,255,.08); color:var(--ink); }
   .nrow .act.pin.on{ color:#e7ebff; }
@@ -73,7 +73,7 @@
   .ntflash.show{ opacity:1; transform:translate(-50%,0); }
 
   /* inputs */
-  input,textarea{ width:100%; padding:12px; border-radius:10px; border:1px solid var(--line); background:rgba(255,255,255,.05); color:var(--ink); font-size:15px; font-family:inherit; }
+  input,textarea{ width:100%; padding:12px; border-radius:10px; border:1px solid var(--line); background:rgba(255,255,255,.05); color:var(--ink); font-size:16px; font-family:inherit; }
   textarea{ resize:none; }
   button.primary{ width:100%; border:0; border-radius:11px; padding:13px; font-size:15px; font-weight:600; font-family:inherit; background:var(--accent); color:#161618; cursor:pointer; margin-top:10px; }
   button.ghost{ width:100%; border:1px solid var(--line); border-radius:11px; padding:12px; font-size:14px; font-family:inherit; background:transparent; color:var(--ink); cursor:pointer; margin-top:10px; }
@@ -216,12 +216,15 @@
   function addMsg(texto, who){ var d=document.createElement('div'); d.className='msg '+who; d.textContent=texto; chatList.appendChild(d); chatList.scrollTop=chatList.scrollHeight; }
   function histSave(){ try{ var msgs=[]; chatList.querySelectorAll('.msg').forEach(function(m){ msgs.push({t:m.textContent,w:m.classList.contains('me')?'me':'bot'}); }); localStorage.setItem('rotina_chat', JSON.stringify(msgs.slice(-60))); }catch(e){} }
   function histLoad(){ try{ var msgs=JSON.parse(localStorage.getItem('rotina_chat')||'[]'); msgs.forEach(function(m){ addMsg(m.t,m.w); }); }catch(e){} if(!chatList.children.length) addMsg('Oi, lust. Me peça pra criar alarme, anotar, ou lembrar de algo ("cobrar cliente em 2 dias"). Posso listar seus alarmes/notas/pendências também.','bot'); }
+  var enviando=false;
   async function enviarChat(){
+    if(enviando) return;
     var v = ($('chatTxt').value||'').trim(); if(!v) return;
+    enviando=true; $('chatSend').disabled=true;
     $('chatTxt').value=''; addMsg(v,'me'); histSave();
-    try{ var r = await rpc('chat.enviar', { texto:v }); addMsg((r.data&&r.data.resposta)||'Ok.','bot'); if(r.data&&r.data.acao&&r.data.acao!=='ajuda'){ /* dado mudou */ } }
-    catch(e){ addMsg('⚠️ '+e.message,'bot'); }
-    histSave();
+    try{ var r = await rpc('chat.enviar', { texto:v }); addMsg((r.data&&r.data.resposta)||'Ok.','bot'); }
+    catch(e){ addMsg('Não consegui responder agora. Tenta de novo.','bot'); }
+    enviando=false; $('chatSend').disabled=false; histSave();
   }
   $('chatSend').onclick = enviarChat;
   $('chatTxt').addEventListener('keydown', function(e){ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); enviarChat(); } });
@@ -249,6 +252,8 @@
     if(!t){ return; }
     try{ await rpc('alarmes.adicionar',{horario:h,titulo:t,icone:'notes',frase:''}); $('alHora').value=''; $('alTit').value=''; carregarAlarmes(); }catch(e){}
   };
+  $('alHora').addEventListener('input', function(){ var d=this.value.replace(/\D/g,'').slice(0,4); this.value = d.length>2 ? d.slice(0,2)+':'+d.slice(2) : d; });
+  document.addEventListener('visibilitychange', function(){ if(!document.hidden){ var act=document.querySelector('nav button.active'); if(act) go(act.dataset.tab); if(secret) rpc('ping').then(function(){ setDot('on'); }).catch(function(){ setDot('off'); }); } });
 
   // ---- NOTAS (rich) ----
   var NIC = {
@@ -327,7 +332,7 @@
       var reg=await navigator.serviceWorker.register('sw.js',{scope:'./'}); await navigator.serviceWorker.ready;
       var sub=await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey:urlB64(VAPID_PUBLIC) });
       var resp=await fetch(NTFY+'/rotina-'+secret+'-subs',{ method:'POST', body:JSON.stringify(sub) }); if(!resp.ok) throw new Error('falha '+resp.status);
-      setSt('Ativado, lust ✓','ok');
+      setSt('Ativado, lust.','ok');
     }catch(e){ setSt('Erro: '+(e.message||e),'err'); }
     $('ativar').disabled=false;
   };
