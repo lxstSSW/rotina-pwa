@@ -76,6 +76,10 @@
   .addbar input.hora{ flex:none; width:78px; text-align:center; font-variant-numeric:tabular-nums; font-weight:600; letter-spacing:.04em; }
   .addbar button{ flex:none; padding:0 17px; min-height:48px; border:0; border-radius:11px; background:var(--accent); color:#16171a; font-weight:600; font-family:inherit; font-size:14.5px; cursor:pointer; }
   .addbar button:active{ filter:brightness(.94); }
+  .row .mid.editavel{ cursor:pointer; }
+  .btncancel{ flex:none; border:1px solid var(--line2); border-radius:11px; padding:0 15px; min-height:48px; background:transparent; color:var(--ink2); font-family:inherit; font-size:14px; cursor:pointer; }
+  .btncancel:active{ background:rgba(255,255,255,.06); color:var(--ink); }
+  .editando{ border-color:var(--line2) !important; box-shadow:inset 0 0 0 1px rgba(255,255,255,.14); }
   .addbar2{ display:flex; flex-wrap:wrap; gap:9px 10px; align-items:center; margin:0 0 14px; }
   .addbar2 .al{ font-size:12px; color:var(--ink3); }
   input.ddmm{ width:70px; flex:none; text-align:center; font-variant-numeric:tabular-nums; }
@@ -322,6 +326,7 @@
         <input id="alHora" class="hora" placeholder="00:00" inputmode="numeric" maxlength="5">
         <input id="alTit" placeholder="Título do alarme">
         <button id="alAdd">Adicionar</button>
+        <button id="alCancel" class="btncancel" style="display:none">Cancelar</button>
       </div>
       <div class="addbar2">
         <span class="al">Repete</span>
@@ -545,6 +550,7 @@
     var dd=mkDropdown(items,'',function(v){ var n=(v==='__nova__'); nova.style.display=n?'flex':'none'; if(n) setTimeout(function(){ ninp.focus(); },0); });
     wrap.appendChild(dd); wrap.appendChild(nova);
     wrap.get=function(){ var v=dd.getValue(); if(v==='') return {tag:'',cor:''}; if(v==='__nova__') return {tag:(ninp.value||'').trim(), cor:ncol.value}; return {tag:v, cor:cores[v]||''}; };
+    wrap.set=function(v){ nova.style.display='none'; dd.setValue(cores.hasOwnProperty(v)?v:''); };
     return wrap;
   }
   async function montarEmp(wrapId){ var cores={}; try{ var r=await rpc('empresas.listar'); cores=(r&&r.data)||{}; }catch(e){} var sel=criarEmpresaSel(cores); var w=$(wrapId); w.innerHTML=''; w.appendChild(sel); return sel; }
@@ -700,6 +706,7 @@
         if(t.tag){ var cg=document.createElement('span'); cg.className='tag'; cg.textContent=t.tag; chipCor(cg,t.cor); t1.appendChild(cg); }
         var t2=document.createElement('div'); t2.className='t2'; t2.textContent=recLabel(t)+(t.frase?' · '+t.frase:'');
         mid.appendChild(t1); mid.appendChild(t2);
+        mid.classList.add('editavel'); mid.setAttribute('aria-label','Editar'); mid.onclick=function(){ preencherFormAl(t); };
         var sw=document.createElement('button'); sw.className='sw'+(t.ativo?' on':'');
         sw.onclick=async function(){ var on=sw.classList.toggle('on'); row.classList.toggle('off',!on); try{ await rpc('alarmes.toggle',{id:t.id}); }catch(e){ sw.classList.toggle('on'); row.classList.toggle('off'); } };
         var x=document.createElement('button'); x.className='x'; x.textContent='×';
@@ -715,21 +722,53 @@
   $('alRecWrap').appendChild(alRecDD);
   document.querySelectorAll('#alDias .dchip').forEach(function(b){ b.onclick=function(){ b.classList.toggle('on'); }; });
   function diasSel(){ return Array.prototype.slice.call(document.querySelectorAll('#alDias .dchip.on')).map(function(b){ return b.dataset.d; }); }
-  $('alAdd').onclick=async function(){
+  var editandoAl=null;
+  function montarArgsAl(){
     var h=($('alHora').value||'').trim();
     if(/^\d{1}:\d{2}$/.test(h)) h='0'+h;
     var t=($('alTit').value||'').trim();
-    if(!/^\d{2}:\d{2}$/.test(h) || !t) return;
+    if(!/^\d{2}:\d{2}$/.test(h) || !t) return null;
     var args={horario:h,titulo:t,icone:'notes',frase:''};
     var rec=alRecDD.getValue(); var dm=($('alDiaMes').value||'').trim();
-    if(rec==='mensal'){ if(!(/^\d{1,2}$/.test(dm) && +dm>=1 && +dm<=31)){ $('alDiaMes').style.boxShadow='0 0 0 1px var(--err)'; setTimeout(function(){ $('alDiaMes').style.boxShadow=''; },800); return; } args.diaDoMes=+dm; }
+    if(rec==='mensal'){ if(!(/^\d{1,2}$/.test(dm) && +dm>=1 && +dm<=31)){ $('alDiaMes').style.boxShadow='0 0 0 1px var(--err)'; setTimeout(function(){ $('alDiaMes').style.boxShadow=''; },800); return null; } args.diaDoMes=+dm; }
     else if(rec==='uteis') args.dias=['mon','tue','wed','thu','fri'];
     else if(rec==='fds') args.dias=['sat','sun'];
-    else if(rec==='dsemana'){ var ds=diasSel(); if(!ds.length){ $('alDias').style.boxShadow='0 0 0 1px var(--err)'; setTimeout(function(){ $('alDias').style.boxShadow=''; },800); return; } args.dias=ds; }
+    else if(rec==='dsemana'){ var ds=diasSel(); if(!ds.length){ $('alDias').style.boxShadow='0 0 0 1px var(--err)'; setTimeout(function(){ $('alDias').style.boxShadow=''; },800); return null; } args.dias=ds; }
     else if(rec==='hoje') args.dataUnica=tzHoje();
     else args.dias='todos';
-    var emp=alEmpSel?alEmpSel.get():{tag:'',cor:''}; if(emp.tag){ args.tag=emp.tag; args.cor=emp.cor; }
-    try{ await rpc('alarmes.adicionar',args); $('alHora').value=''; $('alTit').value=''; $('alDiaMes').value=''; alRecDD.setValue('todos'); $('alDiaMes').style.display='none'; $('alDiasRow').style.display='none'; document.querySelectorAll('#alDias .dchip.on').forEach(function(b){ b.classList.remove('on'); }); montarAlEmp(); carregarAlarmes(); }catch(e){}
+    var emp=alEmpSel?alEmpSel.get():{tag:'',cor:''}; if(emp.tag){ args.tag=emp.tag; args.cor=emp.cor; } else args.tag='';
+    return args;
+  }
+  function resetFormAl(){
+    $('alHora').value=''; $('alTit').value=''; $('alDiaMes').value='';
+    alRecDD.setValue('todos'); $('alDiaMes').style.display='none'; $('alDiasRow').style.display='none';
+    document.querySelectorAll('#alDias .dchip.on').forEach(function(b){ b.classList.remove('on'); });
+    editandoAl=null; $('alAdd').textContent='Adicionar'; $('alCancel').style.display='none';
+    montarAlEmp();
+  }
+  function preencherFormAl(t){
+    editandoAl=t.id;
+    $('alHora').value=t.horario||''; $('alTit').value=t.titulo||'';
+    var rec='todos';
+    if(t.dataUnica) rec='hoje';
+    else if(t.diaDoMes){ rec='mensal'; $('alDiaMes').value=t.diaDoMes; }
+    else if(Array.isArray(t.dias)){ var s=t.dias.slice().sort().join(','); rec = s==='fri,mon,thu,tue,wed'?'uteis' : (s==='sat,sun'?'fds':'dsemana'); }
+    alRecDD.setValue(rec);
+    $('alDiaMes').style.display = rec==='mensal' ? '' : 'none';
+    $('alDiasRow').style.display = rec==='dsemana' ? 'flex' : 'none';
+    document.querySelectorAll('#alDias .dchip').forEach(function(b){ b.classList.toggle('on', rec==='dsemana' && Array.isArray(t.dias) && t.dias.indexOf(b.dataset.d)>=0); });
+    if(alEmpSel && alEmpSel.set) alEmpSel.set(t.tag||'');
+    $('alAdd').textContent='Salvar'; $('alCancel').style.display='';
+    try{ $('alTit').scrollIntoView({block:'center'}); }catch(_){}
+  }
+  $('alCancel').onclick=function(){ resetFormAl(); };
+  $('alAdd').onclick=async function(){
+    var args=montarArgsAl(); if(!args) return;
+    try{
+      if(editandoAl){ args.id=editandoAl; await rpc('alarmes.editar',args); }
+      else await rpc('alarmes.adicionar',args);
+      resetFormAl(); carregarAlarmes();
+    }catch(e){}
   };
   $('alTit').addEventListener('keydown', function(e){ if(e.key==='Enter') $('alAdd').click(); });
 
@@ -975,6 +1014,16 @@
       var mid=document.createElement('div'); mid.className='mid'; var t1=document.createElement('div'); t1.className='t1'; t1.textContent=it.texto; mid.appendChild(t1);
       var x=document.createElement('button'); x.className='x'; x.textContent='×';
       x.onclick=function(){ row.style.opacity=.3; rpc('eventos.remover',{data:key,id:it.id}).then(function(){ recarregarEventos(y,m,day); }).catch(function(){ row.style.opacity=1; }); };
+      mid.classList.add('editavel'); mid.setAttribute('aria-label','Editar'); mid.onclick=function(){
+        row.innerHTML=''; row.classList.add('editando');
+        var ih=document.createElement('input'); ih.className='caladd-hora'; ih.value=it.hora||''; ih.placeholder='--:--'; ih.maxLength=5; ih.inputMode='numeric';
+        ih.addEventListener('input', function(){ var dd=this.value.replace(/\D/g,'').slice(0,4); this.value=dd.length>2?dd.slice(0,2)+':'+dd.slice(2):dd; });
+        var itxt=document.createElement('input'); itxt.className='caladd-txt'; itxt.value=it.texto; itxt.maxLength=140;
+        var sv=document.createElement('button'); sv.className='caladd-btn'; sv.textContent='Salvar';
+        function salvar(){ var v=itxt.value.trim(); if(!v) return; rpc('eventos.editar',{data:key,id:it.id,texto:v,hora:ih.value.trim()}).then(function(){ recarregarEventos(y,m,day); }).catch(function(){}); }
+        sv.onclick=salvar; itxt.addEventListener('keydown',function(e){ if(e.key==='Enter') salvar(); });
+        row.appendChild(ih); row.appendChild(itxt); row.appendChild(sv); itxt.focus();
+      };
       row.appendChild(time); row.appendChild(mid); row.appendChild(x); box.appendChild(row);
     });
     ev.gc.forEach(function(it){
